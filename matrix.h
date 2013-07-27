@@ -1,5 +1,15 @@
-#ifndef _PMAPT_MATRX_H_
-#define _PMAPT_MATRX_H_
+/*
+ * matrix.h
+ *
+ *  Created on: Jul 27, 2013
+ *      Author: Hassan H. Monfared ( hmonfared@gmail.com )
+ */
+
+#ifndef _PMAT_MATRIX_H_
+#define _PMAT_MATRIX_H_
+#include <stdio.h>
+#include <iostream>
+
 template<class T>
 class matrix
 {
@@ -16,8 +26,21 @@ public:
 	virtual ~matrix(void);
 
 	T operator()(size_t prow,size_t pcolumn);
-	matrix<T> &operator =(matrix<T> &&pright); //
-	matrix<T> &operator =(const matrix<T> &pright);
+
+	matrix &operator =(matrix &&pright); //
+	matrix &operator =(const matrix &pright);
+	template<class U>
+	friend auto operator +(matrix<U> &&pleft,const matrix<U> &pright)->matrix<U>;
+	template<class U>
+	friend auto operator +(const matrix<U> &pleft,matrix<U> &&pright)->matrix<U>;
+	template<class U>
+	friend auto operator +(const matrix<U> &pleft,const matrix<U> &pright)->matrix<U>;
+	template<class U>
+	friend auto operator +(matrix<U> &&pleft,matrix<U> &&pright)->matrix<U>;
+	template<class U>
+	friend auto operator *(const matrix<U> &pleft,const matrix<U> &pright)->matrix<U>;
+
+
 };
 
-#endif //_PMAPT_MATRX_H_
+#endif /* MATRIX_H_ */

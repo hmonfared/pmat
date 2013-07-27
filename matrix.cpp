@@ -1,3 +1,10 @@
+/*
+ * matrix.cpp
+ *
+ *  Created on: Jul 27, 2013
+ *      Author: root
+ */
+
 #include "matrix.h"
 
 template<class T>
@@ -16,7 +23,7 @@ matrix<T>::matrix(matrix &&pother):data(nullptr),rows(0),columns(0)
 template<class T>
 matrix<T>::matrix(size_t prows,size_t pcolumns)
 {
-	if(prows <=0 || pcols <=0)
+	if(prows <=0 || pcolumns <=0)
 		throw ("pmat exception: Invalid row/column size");
 	data=new T[prows*pcolumns];
 	rows=prows;
@@ -35,8 +42,8 @@ T matrix<T>::operator()(size_t prow,size_t pcolumn)
 {
 	if(!data)
 		throw ("pmat exception:no memory allocated for matrix");
-	if(prow<0 || prow >= rows || pcol<0 || prow>=rows)
-		throw ("pmat exception: invaid row/column specified");
+	if(prow<0 || prow >= rows || pcolumn<0 || prow>=rows)
+		throw ("pmat exception: invalid row/column specified");
 	return data[prow*columns+pcolumn];
 }
 
@@ -44,7 +51,7 @@ template<class T>
 void matrix<T>::setsize(size_t prows,size_t pcolumns)
 {
 	if(prows <=0 || pcolumns <=0)
-		throw ("pmat exception: invaid row/column size");
+		throw ("pmat exception: invalid row/column size");
 	if(data)
 		delete data;
 	data=new T[prows*pcolumns];
@@ -53,39 +60,39 @@ void matrix<T>::setsize(size_t prows,size_t pcolumns)
 }
 
 template<class T>
-friend auto operator +(matrix<T> &&pleft,const matrix<T> &pright)->matrix<T>
+ auto operator +(matrix<T> &&pleft,const matrix<T> &pright)->matrix<T>
 {
-	//TODO:  sumation goes here:
+	//TODO:  summation goes here:
 
 	return std::move(pleft);
 }
 template<class T>
-friend auto operator +(const matrix<T> &pleft,matrix<T> &&pright)->matrix<T>
+auto operator +(const matrix<T> &pleft,matrix<T> &&pright)->matrix<T>
 {
 	return std::move(pright)+pleft;
 }
 template<class T>
-friend auto operator +(matrix<T> &&pleft,matrix<T> &&pright)->matrix<T>
+ auto operator +(matrix<T> &&pleft,matrix<T> &&pright)->matrix<T>
 {
 	return std::move(pleft)+pright;
 }
 template<class T>
-friend auto operator +(const matrix<T> &pleft,const matrix<T> &pright)->matrix<T>
+ auto operator +(const matrix<T> &pleft,const matrix<T> &pright)->matrix<T>
 {
 	matrix<T> tmp(pleft);
 	return std::move(pleft)+pright;
 }
 
 
-///////////////////////////////// MULTIPLICATION \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+/**** multiplication ******/
 
 template<class T>
-friend auto operator *(const matrix<T> &pleft,const matrix<T> &pright)->matrix<T>
+ auto operator *(const matrix<T> &pleft,const matrix<T> &pright)->matrix<T>
 {
 	if(pleft.columns != pright.rows )
-		throw ("pmat: Invalid dimention for multiplication");
+		throw ("pmat: Invalid dimension for multiplication");
 	matrix<T> result(pleft.rows,pright.columns);
-	//TODO: multipliation goes here
+	//TODO: multiplication goes here
 	return std::move(result);
 }
 
