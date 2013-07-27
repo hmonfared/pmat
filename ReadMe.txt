@@ -1,10 +1,8 @@
 ========================================================================
-    STATIC LIBRARY : pmat Project Overview
+pmat Project Overview
 ========================================================================
 
-AppWizard has created this pmat library project for you.
-
-No source files were created as part of your project.
+pmat is high performance matrix operation library based on c++11.
 
 
 pmat.vcxproj
@@ -23,7 +21,5 @@ pmat.vcxproj.filters
 /////////////////////////////////////////////////////////////////////////////
 Other notes:
 
-AppWizard uses "TODO:" comments to indicate parts of the source code you
-should add to or customize.
 
 /////////////////////////////////////////////////////////////////////////////
