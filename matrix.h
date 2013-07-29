@@ -9,7 +9,16 @@
 #define _PMAT_MATRIX_H_
 #include <stdio.h>
 #include <iostream>
-
+#include <vector>
+#include <thread>
+#define PMAT_MIN_PARTITION_SIZE 30
+#define THE_SIZE(PART_BY,MAT) (( PART_BY == PMAT_PARTITION_BY_ROWS ) ? MAT.rows:MAT.columns)
+enum PMAT_PARTITION_BY
+{
+	PMAT_PARTITION_BY_NONE=0,
+	PMAT_PARTITION_BY_ROWS=1,
+	PMAT_PARTITION_BY_COLUMNS=2
+};
 template<class T>
 class matrix
 {
@@ -17,28 +26,39 @@ private:
 	T *data;
 	size_t rows;
 	size_t columns;
-
+	size_t max_thread_num;
+	void sum(
+		matrix &presult,
+		const matrix &pleft,
+		const matrix &pright,
+		const size_t ppartition_index,
+		const size_t ppartition_size,
+		const short pparition_by);
 public:
 	matrix(void);
 	matrix(matrix &&pother); // move constructor
 	matrix(size_t prows,size_t pcolumns);
 	void setsize(size_t prows,size_t pcolumns);
+	void set_max_thread_num(const size_t pthread_num);
 	virtual ~matrix(void);
 
-	T operator()(size_t prow,size_t pcolumn);
+	T& operator()(size_t prow,size_t pcolumn);
 
 	matrix &operator =(matrix &&pright); //
 	matrix &operator =(const matrix &pright);
+	//bool operator ==(const matrix &pright);
 	template<class U>
-	friend auto operator +(matrix<U> &&pleft,const matrix<U> &pright)->matrix<U>;
+	friend matrix<U> operator +(matrix<U> &&pleft,const matrix<U> &pright);
 	template<class U>
-	friend auto operator +(const matrix<U> &pleft,matrix<U> &&pright)->matrix<U>;
+	friend matrix<U> operator +(const matrix<U> &pleft,matrix<U> &&pright);
 	template<class U>
-	friend auto operator +(const matrix<U> &pleft,const matrix<U> &pright)->matrix<U>;
+	friend matrix<U> operator +(const matrix<U> &pleft,const matrix<U> &pright);
 	template<class U>
-	friend auto operator +(matrix<U> &&pleft,matrix<U> &&pright)->matrix<U>;
+	friend matrix<U> operator +(matrix<U> &&pleft,matrix<U> &&pright);
 	template<class U>
-	friend auto operator *(const matrix<U> &pleft,const matrix<U> &pright)->matrix<U>;
+	friend matrix<U> operator *(const matrix<U> &pleft,const matrix<U> &pright);
+	template<class U>
+	friend matrix<U> operator *(const double &pleft,const matrix<U> &pright);
 
 
 };
