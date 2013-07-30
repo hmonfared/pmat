@@ -1,13 +1,13 @@
-CXXFLAGS =	-O0 -g -Wall -fmessage-length=0 -std=c++11 -fPIC
+CXXFLAGS =	-O0 -g -Wall -fmessage-length=0 -std=c++0x
 
-OBJS =		matrix.o
-
+OBJS =		testmain.o
+CXX=g++47
 LIBS =
 
-TARGET =	pmat.so
+TARGET =	pmat
 
 $(TARGET):	$(OBJS)
-	$(CXX)  -o $(TARGET) -shared $(OBJS) $(LIBS)
+	$(CXX)  -o $(TARGET)  $(OBJS) $(LIBS)
 
 all:	$(TARGET)
 

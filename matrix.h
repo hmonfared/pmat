@@ -11,6 +11,8 @@
 #include <iostream>
 #include <vector>
 #include <thread>
+#include <exception>
+#include <cstring>
 #define PMAT_MIN_PARTITION_SIZE 30
 #define THE_SIZE(PART_BY,MAT) (( PART_BY == PMAT_PARTITION_BY_ROWS ) ? MAT.rows:MAT.columns)
 enum PMAT_PARTITION_BY
@@ -27,48 +29,284 @@ private:
 	size_t rows;
 	size_t columns;
 	size_t max_thread_num;
-	void sum(
+	static void sum(
 		matrix &presult,
 		const matrix &pleft,
 		const matrix &pright,
 		const size_t ppartition_index,
 		const size_t ppartition_size,
-		const short pparition_by);
+		const short pparition_by)
+	{
+		size_t part_loop_end=std::min(ppartition_index+ppartition_size,THE_SIZE(pparition_by,pleft));
+		size_t rowcounter,columncounter,rowend,columnend,rowstart,columnstart;
+		if(pparition_by == PMAT_PARTITION_BY_COLUMNS )
+		{
+			rowstart=0;
+			rowend=pleft.rows;
+			columnstart=ppartition_index*ppartition_size;
+			columnend=part_loop_end;
+		}
+		else
+		{
+			rowstart=ppartition_index*ppartition_size;
+			rowend=part_loop_end;
+			columnstart=0;
+			columnend=pleft.rows;
+		}
+		for(rowcounter=rowstart;rowcounter<rowend;++rowcounter)
+			for(size_t columncounter=columnstart;columncounter<columnend;++columncounter)
+					presult(rowcounter,columncounter)=pleft(rowcounter,columncounter)+pright(rowcounter,columncounter);
+	}
+	static void multiply(matrix &presult,const T &pscalar,const matrix &pright,const size_t ppartition_index,const size_t ppartition_size,const short pparition_by)
+	{
+		size_t part_loop_end=std::min(ppartition_index+ppartition_size,THE_SIZE(pparition_by,pright));
+		size_t rowcounter,columncounter,rowend,columnend,rowstart,columnstart;
+		if(pparition_by == PMAT_PARTITION_BY_COLUMNS )
+		{
+			rowstart=0;
+			rowend=pright.rows;
+			columnstart=ppartition_index*ppartition_size;
+			columnend=part_loop_end;
+		}
+		else
+		{
+			rowstart=ppartition_index*ppartition_size;
+			rowend=part_loop_end;
+			columnstart=0;
+			columnend=pright.rows;
+		}
+		for(rowcounter=rowstart;rowcounter<rowend;++rowcounter)
+			for(size_t columncounter=columnstart;columncounter<columnend;++columncounter)
+					presult(rowcounter,columncounter)=pscalar*pright(rowcounter,columncounter);
+	}
+	static void multiply(matrix &presult,const matrix &pleft,const matrix &pright,const size_t ppartition_index,const size_t ppartition_size,const short pparition_by)
+	{
+		size_t part_loop_end=std::min(ppartition_index+ppartition_size,THE_SIZE(pparition_by,pright));
+		size_t rowcounter,columncounter,rowend,columnend,rowstart,columnstart;
+		if(pparition_by == PMAT_PARTITION_BY_COLUMNS )
+		{
+			rowstart=0;
+			rowend=pright.rows;
+			columnstart=ppartition_index*ppartition_size;
+			columnend=part_loop_end;
+		}
+		else
+		{
+			rowstart=ppartition_index*ppartition_size;
+			rowend=part_loop_end;
+			columnstart=0;
+			columnend=pright.rows;
+		}
+	//TODO: continue from here
+	}
+
 public:
-	matrix(void);
-	matrix(matrix &&pother); // move constructor
-	matrix(matrix &pother); // copy constructor
-	matrix(size_t prows,size_t pcolumns);
-	void setsize(size_t prows,size_t pcolumns);
-	void set_max_thread_num(const size_t pthread_num);
-	virtual ~matrix(void);
+	matrix() // default constructor
+	{
+		data=nullptr;
+		columns=0;
+		rows=0;
+		max_thread_num=8;
+	}
+	matrix(matrix &&pother):data(nullptr),rows(0),columns(0)  // move constructor
+	{
+		*this=std::move(pother);
+	}
+	matrix(matrix &pother):data(nullptr),rows(pother.rows),columns(pother.columns)  // copy constructor
+	{
+		memcpy(data,pother.data,sizeof(T)*pother.rows*pother.columns);
+	}
+	matrix(size_t prows,size_t pcolumns)
+	{
+		if(prows <=0 || pcolumns <=0)
+			throw ("pmat exception: Invalid row/column size");
+		data=new T[prows*pcolumns];
+		rows=prows;
+		columns=pcolumns;
 
-	T& operator()(size_t prow,size_t pcolumn);
+	}
+	void setsize(size_t prows,size_t pcolumns)
+	{
+		if(prows <=0 || pcolumns <=0)
+			throw ("pmat exception: invalid row/column size");
+		if(data)
+			delete data;
+		data=new T[prows*pcolumns];
+		rows=prows;
+		columns=pcolumns;
+	}
+	void set_max_thread_num(const size_t pthread_num)
+	{
+		if(pthread_num<1)
+			throw ("pmat exception: Invalid thread number");
+		max_thread_num=pthread_num;
+	}
+	virtual ~matrix(void)
+	{
+		if(data)
+			delete []data;
+	}
 
-	matrix &operator =(matrix &&pright); //
-	matrix &operator =(const matrix &pright);
-	/***************************** summation functions and operators ******************************************/
-	void sum(matrix<T> &presult,const matrix<T> &pleft,const matrix<T> &pright,const size_t ppartition_index,const size_t ppartition_size,const short pparition_by);
+	T& operator()(size_t prow,size_t pcolumn)
+	{
+		if(!data)
+			throw ("pmat exception:no memory allocated for matrix");
+		if(prow<0 || prow >= rows || pcolumn<0 || prow>=rows)
+			throw ("pmat exception: invalid row/column specified");
+		return data[prow*columns+pcolumn];
+	}
+	T operator()(size_t prow,size_t pcolumn) const
+	{
+		if(!data)
+			throw ("pmat exception:no memory allocated for matrix");
+		if(prow<0 || prow >= rows || pcolumn<0 || prow>=rows)
+			throw ("pmat exception: invalid row/column specified");
+		return data[prow*columns+pcolumn];
+	}
+
+	matrix &operator =(matrix &&pright)
+	{
+		if(this ==&pright)
+			return *this;
+		if(data)
+			delete []data;
+		data=pright.data;
+		rows=pright.rows;
+		columns=pright.columns;
+		pright.data=nullptr;
+		pright.rows=0;
+		pright.columns=0;
+		return *this;
+	}
+	matrix &operator =(const matrix &pright)
+	{
+		if(this ==&pright)
+			return *this;
+		if(data)
+			delete []data; // FIXME: memory realloc is better choice, (... care about shrinking in thid way )
+		data=new T[pright.rows*pright.columns];
+		memcpy(data,pright.data,sizeof(T)*pright.rows*pright.columns);
+		rows=pright.rows;
+		columns=pright.columns;
+		return *this;
+	}
+	// summation functions and operators
 	template<class U>
-	friend matrix<U> operator +(matrix<U> &&pleft,const matrix<U> &pright);
+	friend matrix<U> operator +(matrix<U> &&pleft,const matrix<U> &pright)
+	{
+		short orient=pleft.rows>pleft.columns ? PMAT_PARTITION_BY_ROWS:PMAT_PARTITION_BY_COLUMNS;
+		size_t partition_size= THE_SIZE ( orient , pleft )/pleft.max_thread_num;
+		size_t thread_nums=0;
+		if(partition_size > PMAT_MIN_PARTITION_SIZE )
+			thread_nums = pleft.max_thread_num;
+		else
+		{
+			partition_size = ( orient == PMAT_PARTITION_BY_ROWS ) ? std::min(pleft.rows,PMAT_MIN_PARTITION_SIZE):
+				std::min(pleft.columns,PMAT_MIN_PARTITION_SIZE);
+			thread_nums=( orient == PMAT_PARTITION_BY_ROWS ) ? pleft.rows/partition_size:pleft.columns/partition_size;
+		}
+		std::vector<std::thread> threads(partition_size);
+
+		for(size_t partition=0;partition < partition_size ; ++partition )
+		{
+			std::thread tr(matrix<T>::sum,pleft,pleft,pright,partition,partition_size,orient);
+			threads[partition]=std::move(tr);
+		}
+		for(size_t partition=0;partition < partition_size ; ++partition )
+			threads[partition].join();
+		return std::move(pleft);
+	}
 	template<class U>
-	friend matrix<U> operator +(const matrix<U> &pleft,matrix<U> &&pright);
+	friend matrix<U> operator +(const matrix<U> &pleft,matrix<U> &&pright)
+	{
+		return std::move(pright)+pleft;
+	}
 	template<class U>
-	friend matrix<U> operator +(const matrix<U> &pleft,const matrix<U> &pright);
+	friend matrix<U> operator +(const matrix<U> &pleft,const matrix<U> &pright)
+	{
+		matrix<T> tmp(pleft);
+		return std::move(pleft)+pright;
+	}
 	template<class U>
 	friend matrix<U> operator +(matrix<U> &&pleft,matrix<U> &&pright);
 
-	/***************************** multipliation functions and operators ******************************************/
-	void multiply(matrix &presult,const T &pscalar,const matrix &pright,const size_t ppartition_index,const size_t ppartition_size,const short pparition_by);
-	void multiply(matrix &presult,const matrix &pleft,const matrix &pright,const size_t ppartition_index,const size_t ppartition_size,const short pparition_by);
+	/////multipliation functions and operators //
 
 	template<class U>
-	friend matrix<U> operator *(const matrix<U> &pleft,const matrix<U> &pright);
+	friend matrix<U> operator *(const matrix<U> &pleft,const matrix<U> &pright)
+	{
+		if(pleft.columns != pright.rows )
+			throw ("pmat: Invalid dimension for multiplication");
+		matrix<T> result(pleft.rows,pright.columns);
+
+		short orient=result.rows>result.columns ? PMAT_PARTITION_BY_ROWS:PMAT_PARTITION_BY_COLUMNS;
+		size_t partition_size= THE_SIZE ( orient , result )/pleft.max_thread_num;
+		size_t thread_nums=0;
+		if(partition_size > PMAT_MIN_PARTITION_SIZE )
+			thread_nums = pleft.max_thread_num;
+		else
+		{
+			partition_size = ( orient == PMAT_PARTITION_BY_ROWS ) ? std::min(result.rows,PMAT_MIN_PARTITION_SIZE):
+				std::min(result.columns,PMAT_MIN_PARTITION_SIZE);
+			thread_nums=( orient == PMAT_PARTITION_BY_ROWS ) ? result.rows/partition_size:result.columns/partition_size;
+		}
+		std::vector<std::thread> threads(partition_size);
+
+		for(size_t partition=0;partition < partition_size ; ++partition )
+		{
+			std::thread tr(matrix<T>::multiply,result,pleft,pright,partition,partition_size,orient);
+			threads[partition]=std::move(tr);
+		}
+		for(size_t partition=0;partition < partition_size ; ++partition )
+			threads[partition].join();
+		return std::move(result);
+	}
 	template<class U>
-	friend matrix<U> operator *(const double &pleft,const matrix<U> &pright);
+	friend matrix<U> operator *(const U &pscalar,const matrix<U> &pright)
+	{
+		short orient=pright.rows>pright.columns ? PMAT_PARTITION_BY_ROWS:PMAT_PARTITION_BY_COLUMNS;
+		size_t partition_size= THE_SIZE ( orient , pright )/pright.max_thread_num;
+		size_t thread_nums=0;
+		if(partition_size > PMAT_MIN_PARTITION_SIZE )
+			thread_nums = pright.max_thread_num;
+		else
+		{
+			partition_size = ( orient == PMAT_PARTITION_BY_ROWS ) ? std::min(pright.rows,PMAT_MIN_PARTITION_SIZE):
+				std::min(pright.columns,PMAT_MIN_PARTITION_SIZE);
+			thread_nums=( orient == PMAT_PARTITION_BY_ROWS ) ? pright.rows/partition_size:pright.columns/partition_size;
+		}
+		std::vector<std::thread> threads(partition_size);
+
+		for(size_t partition=0;partition < partition_size ; ++partition )
+		{
+			std::thread tr(matrix<T>::multiply,pright,pscalar,pright,partition,partition_size,orient);
+			threads[partition]=std::move(tr);
+		}
+		for(size_t partition=0;partition < partition_size ; ++partition )
+			threads[partition].join();
+		return std::move(pright);
+	}
 	
-	void add_row(const size_t prow,const std::vector<T> &prow_vector);
-	friend std::ostream &operator<<(std::ostream &pos,const matrix &pmatrix);
+	void add_row(const size_t prow,const std::vector<T> &prow_vector)
+	{
+		size_t last=std::min(prow_vector.size(),columns);
+		size_t col=0;
+		for(;col<columns && col<last;++col)
+			(prow,col)=prow_vector[col];
+		for(;col<columns;++col) // if vector data is no enough , fill reminded columns with zero
+			(prow,col)=0;
+	}
+	template<class U>
+	friend std::ostream &operator<< (std::ostream &pos,const matrix<U> &pmatrix)
+	{
+		for(size_t row=0;row<pmatrix.rows;++row)
+		{
+			for(size_t col=0;col<pmatrix.columns;++col)
+				pos << pmatrix(row,col);
+			pos<< std::endl;
+		}
+		return pos;
+	}
 
 };
 
