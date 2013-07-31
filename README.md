@@ -1,4 +1,4 @@
-pmat
+pmat( Parallel MATrix )
 ====
 
 pmat is header only high performance matrix operation library based on c++11.
