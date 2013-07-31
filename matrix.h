@@ -280,7 +280,7 @@ public:
 
 		for(size_t partition=0;partition < partition_size ; ++partition )
 		{
-			std::thread tr([=](){matrix<U>::multiply(pright,pscalar,pright,partition,partition_size,orient);});
+			std::thread tr([&](){matrix<U>::multiply(pright,pscalar,pright,partition,partition_size,orient);});
 			threads[partition]=std::move(tr);
 		}
 		for(size_t partition=0;partition < partition_size ; ++partition )
