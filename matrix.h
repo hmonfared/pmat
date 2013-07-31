@@ -37,6 +37,7 @@ private:
 public:
 	matrix(void);
 	matrix(matrix &&pother); // move constructor
+	matrix(matrix &pother); // copy constructor
 	matrix(size_t prows,size_t pcolumns);
 	void setsize(size_t prows,size_t pcolumns);
 	void set_max_thread_num(const size_t pthread_num);
@@ -46,7 +47,8 @@ public:
 
 	matrix &operator =(matrix &&pright); //
 	matrix &operator =(const matrix &pright);
-	//bool operator ==(const matrix &pright);
+	/***************************** summation functions and operators ******************************************/
+	void sum(matrix<T> &presult,const matrix<T> &pleft,const matrix<T> &pright,const size_t ppartition_index,const size_t ppartition_size,const short pparition_by);
 	template<class U>
 	friend matrix<U> operator +(matrix<U> &&pleft,const matrix<U> &pright);
 	template<class U>
@@ -55,11 +57,18 @@ public:
 	friend matrix<U> operator +(const matrix<U> &pleft,const matrix<U> &pright);
 	template<class U>
 	friend matrix<U> operator +(matrix<U> &&pleft,matrix<U> &&pright);
+
+	/***************************** multipliation functions and operators ******************************************/
+	void multiply(matrix &presult,const T &pscalar,const matrix &pright,const size_t ppartition_index,const size_t ppartition_size,const short pparition_by);
+	void multiply(matrix &presult,const matrix &pleft,const matrix &pright,const size_t ppartition_index,const size_t ppartition_size,const short pparition_by);
+
 	template<class U>
 	friend matrix<U> operator *(const matrix<U> &pleft,const matrix<U> &pright);
 	template<class U>
 	friend matrix<U> operator *(const double &pleft,const matrix<U> &pright);
-
+	
+	void add_row(const size_t prow,const std::vector<T> &prow_vector);
+	friend std::ostream &operator<<(std::ostream &pos,const matrix &pmatrix);
 
 };
 
