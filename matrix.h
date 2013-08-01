@@ -1,6 +1,6 @@
 /*
 * matrix.h
-*
+* 
 *  Created on: Jul 27, 2013
 *      Author: Hassan H. Monfared ( hmonfared@gmail.com )
 */
@@ -17,25 +17,70 @@
 #define PMAT_DEBUG
 
 
+/*
+All partitions ( row or column blocks ) of matrix to be processed in a single thread must be greater than or equal to this value.
+this is for avoiding lots of small partitions which makes many threads and waste system resources.
+*/
+#define PMAT_MIN_PARTITION_SIZE 50  
 
-#define PMAT_MIN_PARTITION_SIZE 50
+/*
+returns rows of matrix if partitioning is based on rows of marix. else will return columns
+*/
 #define THE_SIZE(PART_BY,MAT) (( PART_BY == PMAT_PARTITION_BY_ROWS ) ? MAT.rows:MAT.columns)
+
+/*
+ returns min value of given pair
+*/
 #define MIN(a,b) ( ((a)<(b)) ? (a):(b) )
 
+/*
+for less coding and aoding function calling, this is used instead of *this(i,j)
+*/
+#define __CELL_THIS(i,j) (*(data+(i)*columns+j))
+
+/*
+for less coding and aoding function calling, this is used instead of mat(i,j)
+*/
+#define __CELL_THAT(mat,i,j) (*(mat.data+(i)*mat.columns+j))
+
+/*
+this enum is used for identifying , how the matrix is partitioned for processing
+*/
 enum PMAT_PARTITION_BY
 {
 	PMAT_PARTITION_BY_NONE=0,
 	PMAT_PARTITION_BY_ROWS=1,
 	PMAT_PARTITION_BY_COLUMNS=2
 };
+
+/*
+this  is header only high performance matrix operation library based on c++11. 
+It uses c++11 threading, rvalue reference and moveing features from c++11.
+Also It is optimized to devide data into smaller parts to be processed in the best way. 
+For example for multplying A(2*5000) * B(5000*1000), data partitioning will done by deviding '1000' in to 10( for example) 
+threads instead of trying to devide data by rows of A
+
+example :
+
+matrix<int> a(2,3);
+a=1; // sets all cells to 1;
+matrix<int> b=2*a;
+std::cout << b;
+
+*/
 template<class T>
 class matrix
 {
 private:
-	T *data;
-	size_t rows;
-	size_t columns;
-	size_t max_thread_num;
+	T *data; // elements of matrix will be stored in data
+	size_t rows; // number of rows
+	size_t columns; // number of columns
+	size_t max_thread_num; // maximum number of threads ( partitions ) which this matrix can be spreaded for processing
+
+	/*
+	 adds a subset of pleft and pright and sets in subset of presult.
+
+	*/
 	static void sum(
 		matrix &presult,
 		const matrix &pleft,
@@ -58,11 +103,11 @@ private:
 			rowstart=ppartition_index*ppartition_size;
 			rowend=part_loop_end;
 			columnstart=0;
-			columnend=pleft.rows;
+			columnend=pleft.columns;
 		}
 		for(rowcounter=rowstart;rowcounter<rowend;++rowcounter)
 			for(size_t columncounter=columnstart;columncounter<columnend;++columncounter)
-				presult(rowcounter,columncounter)=pleft(rowcounter,columncounter)+pright(rowcounter,columncounter);
+				__CELL_THAT(presult,rowcounter,columncounter)=__CELL_THAT(pleft,rowcounter,columncounter)+__CELL_THAT(pright,rowcounter,columncounter);
 	}
 	static void multiply(matrix &presult,const T &pscalar,const matrix &pright,const size_t ppartition_index,const size_t ppartition_size,const short pparition_by)
 	{
@@ -80,17 +125,42 @@ private:
 			rowstart=ppartition_index*ppartition_size;
 			rowend=part_loop_end;
 			columnstart=0;
-			columnend=pright.rows;
+			columnend=pright.columns;
 		}
 		for(rowcounter=rowstart;rowcounter<rowend;++rowcounter)
 			for(size_t columncounter=columnstart;columncounter<columnend;++columncounter)
 			{
-				T r=pscalar*pright(rowcounter,columncounter);
-				presult(rowcounter,columncounter)=r;
+				T r=pscalar*__CELL_THAT(pright,rowcounter,columncounter);
+				__CELL_THAT(presult,rowcounter,columncounter)=r;
 				//std::cout <<" (i,j )=" << presult(rowcounter,columncounter)<< "r="<<r<<std::endl;
 			}
 	}
-	static void multiply(matrix &presult,const matrix &pleft,const matrix &pright,const size_t ppartition_index,const size_t ppartition_size,const short pparition_by)
+void transpose_block(matrix &presult,const size_t ppartition_index,const size_t ppartition_size,const short pparition_by)
+	{
+		size_t part_loop_end=MIN(ppartition_index*ppartition_size+ppartition_size,THE_SIZE(pparition_by,presult));
+		size_t rowcounter,columncounter,rowend,columnend,rowstart,columnstart;
+		if(pparition_by == PMAT_PARTITION_BY_COLUMNS )
+		{
+			rowstart=0;
+			rowend=presult.rows;
+			columnstart=ppartition_index*ppartition_size;
+			columnend=part_loop_end;
+		}
+		else
+		{
+			rowstart=ppartition_index*ppartition_size;
+			rowend=part_loop_end;
+			columnstart=0;
+			columnend=presult.columns;
+		}
+		//TODO: continue from here
+		T inner_sum;
+		for(size_t row=rowstart;row<rowend;++row)
+			for(size_t col=columnstart;col<columnend;++col)
+				__CELL_THAT(presult,col,row)=__CELL_THIS(row,col);
+	}
+
+			static void multiply(matrix &presult,const matrix &pleft,const matrix &pright,const size_t ppartition_index,const size_t ppartition_size,const short pparition_by)
 	{
 		size_t part_loop_end=MIN(ppartition_index*ppartition_size+ppartition_size,THE_SIZE(pparition_by,pright));
 		size_t rowcounter,columncounter,rowend,columnend,rowstart,columnstart;
@@ -106,7 +176,7 @@ private:
 			rowstart=ppartition_index*ppartition_size;
 			rowend=part_loop_end;
 			columnstart=0;
-			columnend=pright.rows;
+			columnend=pright.columns;
 		}
 		//TODO: continue from here
 		T inner_sum;
@@ -116,8 +186,8 @@ private:
 			{
 				inner_sum=0;
 				for(size_t inner=0;inner<pright.rows;++inner)
-					inner_sum+=pleft(row,inner)*pright(inner,col);
-				presult(row,col)=inner_sum;
+					inner_sum+=__CELL_THAT(pleft,row,inner)*__CELL_THAT(pright,inner,col);
+				__CELL_THAT(presult,row,col)=inner_sum;
 			}
 		}
 	}
@@ -179,21 +249,21 @@ public:
 			delete []data;
 	}
 
-	T& operator()(size_t prow,size_t pcolumn)
+	inline T& operator()(size_t prow,size_t pcolumn)
 	{
 		if(!data)
 			throw ("pmat exception:no memory allocated for matrix");
 		if(prow<0 || prow >= rows || pcolumn<0 || prow>=rows)
 			throw ("pmat exception: invalid row/column specified");
-		return data[prow*columns+pcolumn];
+		return __CELL_THIS(prow,pcolumn); // data[prow*columns+pcolumn];
 	}
-	T operator()(size_t prow,size_t pcolumn) const
+	inline T operator()(size_t prow,size_t pcolumn) const
 	{
 		if(!data)
 			throw ("pmat exception:no memory allocated for matrix");
 		if(prow<0 || prow >= rows || pcolumn<0 || prow>=rows)
 			throw ("pmat exception: invalid row/column specified");
-		return data[prow*columns+pcolumn];
+		return __CELL_THIS(prow,pcolumn);
 	}
 
 	matrix &operator =(matrix &&pright)
@@ -236,6 +306,52 @@ public:
 			return *this;
 		std::fill(data,data+rows*columns,pright);
 	}
+	/*
+	Transposes itself
+	*/
+	void transpose()
+	{
+		if(columns==1 || rows==1)
+		{
+			std::swap(columns,rows);
+			return;
+		}
+		
+		matrix<T>  result(columns,rows);
+		result.max_thread_num=max_thread_num;
+		short orient=result.rows>result.columns ? PMAT_PARTITION_BY_ROWS:PMAT_PARTITION_BY_COLUMNS;
+		size_t partition_size= THE_SIZE ( orient , result )/max_thread_num;
+		size_t thread_nums=0;
+		if(partition_size > PMAT_MIN_PARTITION_SIZE )
+			thread_nums = max_thread_num;
+		else
+		{
+			partition_size = ( orient == PMAT_PARTITION_BY_ROWS ) ? MIN(result.rows,PMAT_MIN_PARTITION_SIZE):
+				MIN(result.columns,PMAT_MIN_PARTITION_SIZE);
+			thread_nums=( orient == PMAT_PARTITION_BY_ROWS ) ? result.rows/partition_size:result.columns/partition_size;
+		}
+		std::vector<std::thread> threads(partition_size);
+
+		for(size_t partition=0;partition < partition_size ; ++partition )
+		{
+			
+			threads[partition]=std::thread([&](){matrix<T>::transpose_block(result,partition,partition_size,orient);});
+		}
+		for(size_t partition=0;partition < partition_size ; ++partition )
+			threads[partition].join();
+
+		*this=std::move(result);
+	}
+	/*
+		make a copy of this matrix, then transpose, and return it
+	*/
+	matrix<T> 	get_transpose()
+	{
+		matrix<T> result(*this); // make a copy
+		result.transpose();
+		return std::move(result);
+	}
+
 	// summation functions and operators
 	template<class U>
 	friend matrix<U> operator +(matrix<U> &&pleft,const matrix<U> &pright)
@@ -350,9 +466,9 @@ public:
 		size_t last=NIN(prow_vector.size(),columns);
 		size_t col=0;
 		for(;col<columns && col<last;++col)
-			(prow,col)=prow_vector[col];
+			__CELL_THIS(prow,col)=prow_vector[col];
 		for(;col<columns;++col) // if vector data is no enough , fill reminded columns with zero
-			(prow,col)=0;
+			__CELL_THIS(prow,col)=0;
 	}
 	template<class U>
 	friend std::ostream &operator<< (std::ostream &pos,const matrix<U> &pmatrix)
@@ -360,7 +476,7 @@ public:
 		for(size_t row=0;row<pmatrix.rows;++row)
 		{
 			for(size_t col=0;col<pmatrix.columns;++col)
-				pos <<std::setw(5)<< pmatrix(row,col) << std::setprecision(3);
+				pos <<std::setw(5)<< __CELL_THAT(pmatrix,row,col) << std::setprecision(3);
 			pos<< std::endl;
 		}
 		return pos;
