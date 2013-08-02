@@ -79,61 +79,27 @@ private:
 
 	/*
 	 adds a subset of pleft and pright and sets in subset of presult.
-
+	 because cells of matrix are stored in row level linear memory. its cache friendly to add two arrays
+	 linearly. ( there is no need for result(i,j)=left(i,j)+right(i,j) )
 	*/
 	static void sum(
 		matrix &presult,
 		const matrix &pleft,
 		const matrix &pright,
 		const size_t ppartition_index,
-		const size_t ppartition_size,
-		const short pparition_by)
+		const size_t ppartition_size)
 	{
-		size_t part_loop_end=MIN(ppartition_index*ppartition_size+ppartition_size,THE_SIZE(pparition_by,pleft));
-		size_t rowcounter,columncounter,rowend,columnend,rowstart,columnstart;
-		if(pparition_by == PMAT_PARTITION_BY_COLUMNS )
-		{
-			rowstart=0;
-			rowend=pleft.rows;
-			columnstart=ppartition_index*ppartition_size;
-			columnend=part_loop_end;
-		}
-		else
-		{
-			rowstart=ppartition_index*ppartition_size;
-			rowend=part_loop_end;
-			columnstart=0;
-			columnend=pleft.columns;
-		}
-		for(rowcounter=rowstart;rowcounter<rowend;++rowcounter)
-			for(size_t columncounter=columnstart;columncounter<columnend;++columncounter)
-				__CELL_THAT(presult,rowcounter,columncounter)=__CELL_THAT(pleft,rowcounter,columncounter)+__CELL_THAT(pright,rowcounter,columncounter);
+		size_t part_end=MIN(ppartition_index*ppartition_size+ppartition_size,(pleft.rows*pleft.columns));
+		size_t part_start=ppartition_index*ppartition_size;
+		for(size_t cellcounter=part_start;cellcounter<part_end;++cellcounter)
+			*(presult.data+cellcounter)=*(pleft.data+cellcounter)+ (*(pright.data+cellcounter));
 	}
-	static void multiply(matrix &presult,const T &pscalar,const matrix &pright,const size_t ppartition_index,const size_t ppartition_size,const short pparition_by)
+	static void multiply(matrix &presult,const T &pscalar,const matrix &pright,const size_t ppartition_index,const size_t ppartition_size)
 	{
-		size_t part_loop_end=MIN(ppartition_index*ppartition_size+ppartition_size,THE_SIZE(pparition_by,pright));
-		size_t rowcounter,columncounter,rowend,columnend,rowstart,columnstart;
-		if(pparition_by == PMAT_PARTITION_BY_COLUMNS )
-		{
-			rowstart=0;
-			rowend=pright.rows;
-			columnstart=ppartition_index*ppartition_size;
-			columnend=part_loop_end;
-		}
-		else
-		{
-			rowstart=ppartition_index*ppartition_size;
-			rowend=part_loop_end;
-			columnstart=0;
-			columnend=pright.columns;
-		}
-		for(rowcounter=rowstart;rowcounter<rowend;++rowcounter)
-			for(size_t columncounter=columnstart;columncounter<columnend;++columncounter)
-			{
-				T r=pscalar*__CELL_THAT(pright,rowcounter,columncounter);
-				__CELL_THAT(presult,rowcounter,columncounter)=r;
-				//std::cout <<" (i,j )=" << presult(rowcounter,columncounter)<< "r="<<r<<std::endl;
-			}
+		size_t part_end=MIN(ppartition_index*ppartition_size+ppartition_size,(pright.rows*pright.columns));
+		size_t part_start=ppartition_index*ppartition_size;
+		for(size_t cellcounter=part_start;cellcounter<part_end;++cellcounter)
+			*(presult.data+cellcounter)=pscalar* (*(pright.data+cellcounter));
 	}
 void transpose_block(matrix &presult,const size_t ppartition_index,const size_t ppartition_size,const short pparition_by)
 	{
@@ -203,7 +169,7 @@ public:
 	matrix(matrix &&pother):data(nullptr),rows(0),columns(0),max_thread_num(std::thread::hardware_concurrency())  // move constructor
 	{
 #ifdef PMAT_DEBUG
-		std::cout << "in move cor"<< std::endl;
+		std::cout << "in move ctor"<< std::endl;
 #endif
 
 		*this=std::move(pother);
@@ -211,7 +177,7 @@ public:
 	matrix(matrix const &pother):data(nullptr),rows(pother.rows),columns(pother.columns),max_thread_num(pother.max_thread_num)  // copy constructor
 	{
 		#ifdef PMAT_DEBUG
-		std::cout << "in copy cor"<< std::endl;
+		std::cout << "in copy ctor"<< std::endl;
 #endif
 
 		data=new T[pother.rows*pother.columns]; // alocate memory for data
@@ -356,24 +322,20 @@ public:
 	template<class U>
 	friend matrix<U> operator +(matrix<U> &&pleft,const matrix<U> &pright)
 	{
-		short orient=pleft.rows>pleft.columns ? PMAT_PARTITION_BY_ROWS:PMAT_PARTITION_BY_COLUMNS;
-		size_t partition_size= THE_SIZE ( orient , pleft )/pleft.max_thread_num;
+		size_t total_size=pleft.rows*pleft.columns;
+		size_t partition_size= total_size /pleft.max_thread_num;
 		size_t thread_nums=0;
 		if(partition_size > PMAT_MIN_PARTITION_SIZE )
 			thread_nums = pleft.max_thread_num;
 		else
-		{
-			partition_size = ( orient == PMAT_PARTITION_BY_ROWS ) ? MIN(pleft.rows,PMAT_MIN_PARTITION_SIZE):
-				MIN(pleft.columns,PMAT_MIN_PARTITION_SIZE);
-			thread_nums=( orient == PMAT_PARTITION_BY_ROWS ) ? pleft.rows/partition_size:pleft.columns/partition_size;
-		}
+			thread_nums=total_size/partition_size;
 		std::vector<std::thread> threads(thread_nums);
 #ifdef PMAT_DEBUG
 		std::cout << "++part size="<<partition_size <<" thread nums="<<thread_nums<<std::endl;
 #endif 
 		for(size_t partition=0;partition < thread_nums ; ++partition )
 		{
-			threads[partition]=std::thread([&](){matrix<T>::sum(pleft,pleft,pright,partition,partition_size,orient);});
+			threads[partition]=std::thread([&](){matrix<T>::sum(pleft,pleft,pright,partition,partition_size);});
 		}
 		for(size_t partition=0;partition <thread_nums ; ++partition )
 			threads[partition].join();
@@ -427,28 +389,22 @@ public:
 	template<class U>
 	friend matrix<U> operator *(const U &pscalar,matrix<U> &pright)
 	{
-		short orient=pright.rows>pright.columns ? PMAT_PARTITION_BY_ROWS:PMAT_PARTITION_BY_COLUMNS;
-		size_t partition_size= THE_SIZE ( orient , pright )/pright.max_thread_num;
-		size_t thread_nums=0;
 		matrix<U> result(pright);
+		size_t total_size=pright.rows*pright.columns;
+		size_t partition_size= total_size /pright.max_thread_num;
+		size_t thread_nums=0;
 		if(partition_size > PMAT_MIN_PARTITION_SIZE )
 			thread_nums = pright.max_thread_num;
 		else
-		{
-			partition_size = ( orient == PMAT_PARTITION_BY_ROWS ) ? MIN(pright.rows,PMAT_MIN_PARTITION_SIZE):
-				MIN(pright.columns,PMAT_MIN_PARTITION_SIZE);
-			thread_nums=( orient == PMAT_PARTITION_BY_ROWS ) ? pright.rows/partition_size:pright.columns/partition_size;
-		}
+			thread_nums=total_size/partition_size;
 		std::vector<std::thread> threads(thread_nums);
 #ifdef PMAT_DEBUG
 		std::cout << "**part size="<<partition_size <<" thread nums="<<thread_nums<<std::endl;
 #endif 
-		int s=2;
 		for(size_t partition=0;partition < thread_nums ; ++partition )
 		{
-			threads[partition]=std::thread([&](){matrix<U>::multiply(result,pscalar,pright,partition,partition_size,orient);s++;});
+			threads[partition]=std::thread([&](){matrix<U>::multiply(result,pscalar,pright,partition,partition_size);});
 		}
-		std::cout <<" SSSSSSSSSSSSSSSSS="<<s<<std::endl;
 		{
 			std::vector<std::thread>::iterator iter=threads.begin();
 			for(;iter!=threads.end();++iter)
