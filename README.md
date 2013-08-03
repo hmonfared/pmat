@@ -9,6 +9,8 @@ by rows of A
 
 Supported operations:
 =====================
-Add : C=A+B
-Multiply : C=A*B   &  A=2*B
-Scalar Value Assignment: A=2 ( fills all cells of A with 2)
+
+* Add : C=A+B
+* Multiply : C=A*B   &  A=2*B
+* Scalar Value Assignment: A=2 ( fills all cells of A with 2)
+* Transpose
