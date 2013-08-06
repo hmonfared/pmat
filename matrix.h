@@ -16,7 +16,7 @@
 #include <iomanip>
 #include <string>
 #define PMAT_DEBUG
-
+#define PMAT_SWAP_MULT
 /*
 All partitions ( row or column blocks ) of matrix to be processed in a single thread must be greater than or equal to this value.
 this is for avoiding lots of small partitions which makes many threads and waste system resources.
@@ -155,15 +155,27 @@ private:
 			//TODO: continue from here
 			std::cout <<" in the thread multiply #"<<std::this_thread::get_id()<<" partition #"<<ppartition_index<<std::endl;
 			T inner_sum;
-			for (size_t row = rowstart; row < rowend; ++row) {
-				for (size_t col = columnstart; col < columnend; ++col) {
+#ifdef PMAT_SWAP_MULT
+				presult=0;
+				for (size_t i = rowstart; i < rowend; ++i) {
+				 for (size_t k = 0; k < pright.rows; ++k){
 					inner_sum = 0;
-					for (size_t inner = 0; inner < pright.rows; ++inner)
-						inner_sum += __CELL_THAT(pleft,row,inner)
-						*__CELL_THAT(pright,inner,col);
-					__CELL_THAT(presult,row,col) = inner_sum;
+					T& left_ik=__CELL_THAT(pleft,i,k);
+					for (size_t j = columnstart; j < columnend; ++j)
+						__CELL_THAT(presult,i,j) += left_ik *__CELL_THAT(pright,k,j);
 				}
 			}
+
+#else
+			for (size_t i = rowstart; i < rowend; ++i) {
+				for (size_t j = columnstart; j < columnend; ++j) {
+					inner_sum = 0;
+					for (size_t k = 0; k < pright.rows; ++k)
+						inner_sum += __CELL_THAT(pleft,i,k)*__CELL_THAT(pright,k,j);
+					__CELL_THAT(presult,i,j) = inner_sum;
+				}
+			}
+#endif 
 	}
 
 public:
